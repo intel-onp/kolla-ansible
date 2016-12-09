@@ -14,6 +14,7 @@ nova_services:
       - "/etc/localtime:/etc/localtime:ro"
       - "/lib/modules:/lib/modules:ro"
       - "/run/:/run/:shared"
+      - "/var/run/openvswitch:/var/run/openvswitch"
       - "/dev:/dev"
       - "/sys/fs/cgroup:/sys/fs/cgroup"
       - "kolla_logs:/var/log/kolla/"
