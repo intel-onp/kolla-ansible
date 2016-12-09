@@ -24,6 +24,8 @@
     - "neutron-server"
     - "openvswitch-db-server"
     - "openvswitch-vswitchd"
+    - "ovsdpdk-db"
+    - "ovsdpdk-vswitchd"
     - "neutron-lbaas-agent"
     - "neutron-vpnaas-agent"
 
@@ -40,6 +42,8 @@
     - "neutron-server"
     - "openvswitch-db-server"
     - "openvswitch-vswitchd"
+    - "ovsdpdk-db"
+    - "ovsdpdk-vswitchd"
     - "neutron-lbaas-agent"
     - "neutron-vpnaas-agent"
 

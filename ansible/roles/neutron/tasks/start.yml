@@ -19,6 +19,29 @@
        or inventory_hostname in groups['neutron-metadata-agent']
        or inventory_hostname in groups['neutron-vpnaas-agent'])
     - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "system"
+
+- name: Starting ovsdpdk-db container
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    image: "{{ ovsdpdk_db_image_full }}"
+    name: "openvswitch_db"
+    volumes:
+      - "{{ node_config_directory }}/ovsdpdk-db/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/run:/run:shared"
+      - "kolla_logs:/var/log/kolla/"
+      - "openvswitch_db:/var/lib/openvswitch/"
+  when:
+    - (inventory_hostname in groups['compute']
+       or (enable_manila | bool and inventory_hostname in groups['manila-share'])
+       or inventory_hostname in groups['neutron-dhcp-agent']
+       or inventory_hostname in groups['neutron-l3-agent']
+       or inventory_hostname in groups['neutron-metadata-agent']
+       or inventory_hostname in groups['neutron-vpnaas-agent'])
+    - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "netdev"
 
 - name: Waiting the openvswitch_db service to be ready
   command: docker exec openvswitch_db ovs-vsctl --no-wait show
@@ -36,8 +59,8 @@
        or inventory_hostname in groups['neutron-vpnaas-agent'])
     - neutron_plugin_agent == "openvswitch"
 
-- name: Ensuring OVS bridge is properly setup
-  command: docker exec openvswitch_db /usr/local/bin/kolla_ensure_openvswitch_configured {{ item.0 }} {{ item.1 }}
+- name: Ensuring OVS bridges are properly setup
+  command: docker exec openvswitch_db /usr/local/bin/kolla_ensure_openvswitch_configured {{ item.0 }} {{ item.1 }} {{ ovs_datapath }}
   register: status
   changed_when: status.stdout.find('changed') != -1
   when:
@@ -48,6 +71,24 @@
        or inventory_hostname in groups['neutron-metadata-agent']
        or inventory_hostname in groups['neutron-vpnaas-agent'])
     - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "system"
+  with_together:
+    - "{{ neutron_bridge_name.split(',') }}"
+    - "{{ neutron_external_interface.split(',') }}"
+
+- name: Ensuring ovsdpdk bridges are properly setup
+  command: docker exec openvswitch_db /usr/local/bin/kolla_ensure_ovsdpdk_configured {{ item.0 }} {{ item.1 }} {{ ovs_datapath }}
+  register: status
+  changed_when: status.stdout.find('changed') != -1
+  when:
+    - (inventory_hostname in groups['compute']
+       or (enable_manila | bool and inventory_hostname in groups['manila-share'])
+       or inventory_hostname in groups['neutron-dhcp-agent']
+       or inventory_hostname in groups['neutron-l3-agent']
+       or inventory_hostname in groups['neutron-metadata-agent']
+       or inventory_hostname in groups['neutron-vpnaas-agent'])
+    - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "netdev"
   with_together:
     - "{{ neutron_bridge_name.split(',') }}"
     - "{{ neutron_external_interface.split(',') }}"
@@ -73,6 +114,30 @@
        or inventory_hostname in groups['neutron-metadata-agent']
        or inventory_hostname in groups['neutron-vpnaas-agent'])
     - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "system"
+
+- name: Starting openvswitch-vswitchd-dpdk container
+  kolla_docker:
+    action: "start_container"
+    common_options: "{{ docker_common_options }}"
+    image: "{{ ovsdpdk_vswitchd_image_full }}"
+    name: "openvswitch_vswitchd"
+    privileged: True
+    volumes:
+      - "{{ node_config_directory }}/openvswitch-vswitchd/:{{ container_config_directory }}/:ro"
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/lib/modules:/lib/modules:ro"
+      - "/var/run:/var/run"
+      - "kolla_logs:/var/log/kolla/"
+      - "/dev:/dev:rw"
+  when:
+    - (inventory_hostname in groups['compute']
+       or (enable_manila | bool and inventory_hostname in groups['manila-share'])
+       or inventory_hostname in groups['neutron-dhcp-agent']
+       or inventory_hostname in groups['neutron-l3-agent']
+       or inventory_hostname in groups['neutron-metadata-agent'])
+    - neutron_plugin_agent == "openvswitch"
+    - ovs_datapath == "netdev"
 
 - name: Starting neutron-server container
   kolla_docker:
@@ -97,7 +162,7 @@
       - "{{ node_config_directory }}/neutron-openvswitch-agent/:{{ container_config_directory }}/:ro"
       - "/etc/localtime:/etc/localtime:ro"
       - "/lib/modules:/lib/modules:ro"
-      - "/run:/run:shared"
+      - "{{ (ovs_datapath == 'system' )|ternary('/run:/run:shared','/var/run:/var/run:shared') }}"
       - "kolla_logs:/var/log/kolla/"
   when:
     - (
@@ -159,7 +224,7 @@
       - "{{ node_config_directory }}/neutron-openvswitch-agent-fake-{{ item }}/:{{ container_config_directory }}/:ro"
       - "/etc/localtime:/etc/localtime:ro"
       - "/lib/modules:/lib/modules:ro"
-      - "/run:/run:shared"
+      - "{{ (ovs_datapath == 'system' )|ternary('/run:/run:shared','/var/run:/var/run:shared') }}"
       - "kolla_logs:/var/log/kolla/"
   with_sequence: start=1 end={{ num_nova_fake_per_node }}
   when:
